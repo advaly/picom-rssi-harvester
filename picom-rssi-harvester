@@ -1,0 +1,62 @@
+#!/bin/sh
+
+LOGPATH=/opt/picom/log
+. /opt/picom/config
+
+if [ -z "$GW_ID" ]; then
+    GW_ID="unknown"
+fi
+
+btscan () {
+    while :
+    do
+        if ! pgrep -f 'bluetoothctl scan on' > /dev/null 2>&1; then
+            bluetoothctl scan on > /dev/null 2>&1 &
+        fi
+        sleep 1
+    done
+}
+
+sender () {
+    while :
+    do
+        sleep 60
+        for log in "$LOGPATH"/*.log
+        do
+            MSG="$(printf "datetime,gw_id,beacon_id,rssi\n" && cat "$log" && printf "END\n")"
+            if curl -i -X POST -d "$MSG" "$URL" -k > /dev/null 2>&1; then
+                printf "%s is uploaded\n" "$log"
+                rm "$log" 2> /dev/null
+            else
+                printf "Failed to upload %s\n" "$log" 1>&2
+            fi
+        done
+    done
+}
+
+harvester () {
+    while :
+    do
+        READ_RSSI=0
+        btmon 2> /dev/null | while read -r line
+        do
+            if printf "%s" "$line" | grep -q Advaly_cow; then
+                BEACON_ID="$(printf "%s" "$line" | cut -d : -f 2 | awk '{print $2}')"
+                READ_RSSI=1
+            elif [ "$READ_RSSI" -eq 1 ] && printf "%s" "$line" | grep -q RSSI; then
+                RSSI="$(printf "%s" "$line" | cut -d : -f 2 | awk '{print $1}')"
+                printf "%s,%s,%s,%s\n" "$(date '+%Y/%m/%d %H:%M:%S')" "$GW_ID" "$BEACON_ID" "$RSSI" | tee -a "$LOGPATH"/"$(date '+%Y%m%d_%H%M00')".log
+                READ_RSSI=0
+            else
+                READ_RSSI=0
+            fi
+        done
+    done
+}
+
+cd "$(dirname "$0")" || exit 1
+mkdir -p "$LOGPATH"
+
+btscan &
+sender &
+harvester

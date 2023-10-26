@@ -1,0 +1,11 @@
+[Unit]
+Description=Picom RSSI harvester
+
+[Service]
+Type=simple
+ExecStart=/opt/picom/picom-rssi-harvester
+Restart=always
+KillMode=control-group
+
+[Install]
+WantedBy=multi-user.target
