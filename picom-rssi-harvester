@@ -23,13 +23,15 @@ sender () {
         sleep 60
         for log in "$LOGPATH"/*.log
         do
-            MSG="$(printf "datetime,gw_id,beacon_id,rssi\n" && cat "$log" && printf "END\n")"
-            if curl -i -X POST -d "$MSG" "$URL" -k > /dev/null 2>&1; then
-                printf "%s is uploaded\n" "$log"
-                rm "$log" 2> /dev/null
-            else
-                printf "Failed to upload %s\n" "$log" 1>&2
-            fi
+	    if [ -n "$log" ]; then
+                MSG="$(printf "datetime,gw_id,beacon_id,rssi\n" && cat "$log" && printf "END\n")"
+                if curl -i -X POST -d "$MSG" "$URL" -k > /dev/null 2>&1; then
+                    printf "%s is uploaded\n" "$log"
+                    rm "$log" 2> /dev/null
+                else
+                    printf "Failed to upload %s\n" "$log" 1>&2
+                fi
+	    fi
         done
     done
 }
